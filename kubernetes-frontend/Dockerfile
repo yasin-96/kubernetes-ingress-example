@@ -1,22 +1,24 @@
-FROM node:18-alpine as build
-
+FROM node:20-bookworm AS build
 WORKDIR /app
 
-COPY package*.json ./
+COPY certs/ /tmp/certs/
 
-RUN npm install
+COPY package.json package-lock.json ./
+RUN if [ -f /tmp/certs/zscaler.pem ]; then \
+      NODE_EXTRA_CA_CERTS=/tmp/certs/zscaler.pem npm ci --include=dev; \
+    else \
+      npm ci --include=dev; \
+    fi
 
 COPY . .
 
-# React app for production
-RUN npm run build
+RUN if [ -f /tmp/certs/zscaler.pem ]; then \
+      NODE_EXTRA_CA_CERTS=/tmp/certs/zscaler.pem npm run build; \
+    else \
+      npm run build; \
+    fi
 
-# Using Nginx for serving static files
 FROM nginx:alpine
-
-# Copying the built files from the previous stage
 COPY --from=build /app/dist /usr/share/nginx/html
-
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
