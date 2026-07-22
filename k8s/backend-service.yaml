@@ -3,6 +3,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hello
+  labels:
+    app: backend
 spec:
   selector:
     app: backend
@@ -10,5 +12,9 @@ spec:
   - name: http
     port: 8080
     protocol: TCP
-    targetPort: 8080
+    targetPort: http
+  - name: management
+    port: 8081
+    protocol: TCP
+    targetPort: management
 ...

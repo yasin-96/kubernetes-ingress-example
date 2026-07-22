@@ -3,6 +3,7 @@ kind: Ingress
 metadata:
   name: myapp-ingress
 spec:
+  ingressClassName: nginx
   rules:
     - host: myappapi.com
       http:
@@ -23,5 +24,4 @@ spec:
             service:
               name: hello-frontend
               port:
-                number: 80            
-       
+                number: 80
