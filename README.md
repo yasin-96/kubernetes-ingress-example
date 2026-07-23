@@ -155,7 +155,7 @@ kubectl apply -f k8s/monitoring/dashboard-cm.yaml
 
 ```bash
 kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80
-# http://localhost:3000  —  admin / <see values file or Helm-generated secret>
+# http://localhost:3000  —  admin / admin (set in values-prometheus.yaml)
 
 kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
 # http://localhost:9090/targets
@@ -341,7 +341,7 @@ certificate validation — see [Design decisions](#design-decisions).
 **Java build fails with "Unable to locate a Java Runtime"**
 No local JDK is installed. Install one (`brew install --cask temurin@21` or via
 [SDKMAN](https://sdkman.io)), or build without a local JDK using a multi-stage
-Maven Docker build instead — see the backend `Dockerfile` comments.
+Maven Docker build instead.
 
 **Prometheus target missing or `DOWN`**
 Check in this order: does the service carry the `app: backend` label (required —
