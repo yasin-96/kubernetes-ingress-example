@@ -1,0 +1,17 @@
+# Production overrides. Only what differs from the defaults in values.yaml.
+
+backend:
+  replicaCount: 4
+  image:
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 3
+  image:
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+ingress:
+  backendHost: api.myapp.example.com
+  frontendHost: app.myapp.example.com

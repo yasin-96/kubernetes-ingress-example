@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hello-app
+description: Host-based NGINX ingress example with a Spring Boot backend and a React frontend
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
