@@ -2,7 +2,7 @@
 # These are the values used unless overridden (e.g. with -f values-prod.yaml or --set).
 
 backend:
-  replicaCount: 2
+  replicaCount: 3
   image:
     repository: new-backend-image
     tag: latest
