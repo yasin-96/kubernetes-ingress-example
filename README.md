@@ -44,6 +44,7 @@ demonstrates.
 | Metrics | Spring Boot Actuator + Micrometer (Prometheus format) |
 | Monitoring | Prometheus, Grafana (kube-prometheus-stack via Helm) |
 | Packaging | Helm chart (`helm/hello-app/`) with per-environment values |
+| GitOps | Argo CD (`argocd/application.yaml`) syncing the chart from Git |
 | Local cluster | Minikube |
 
 ---
@@ -184,6 +185,69 @@ single command.
 
 ---
 
+## GitOps with Argo CD
+
+The Helm chart can also be deployed the GitOps way with **Argo CD**: instead of
+running `helm install`/`helm upgrade` by hand, Argo CD runs inside the cluster,
+watches this repository, and continuously reconciles the cluster state with the
+chart in Git. Git becomes the single source of truth — changes reach the cluster
+through a commit, not through a manual deploy.
+
+### Install Argo CD
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Wait until the pods are ready (`kubectl get pods -n argocd`), then access the UI:
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# initial admin password:
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+### The Application
+
+`argocd/application.yaml` defines an Argo CD `Application` that points at the Helm
+chart in this repo (`path: helm/hello-app`), targets the `default` namespace, and
+enables automated sync with `selfHeal` and `prune`. Argo CD detects that the path
+is a Helm chart, renders it, and applies the manifests.
+
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+The application then shows two independent statuses: **Sync** (does the cluster
+match Git?) and **Health** (are the deployed resources actually up?).
+
+### GitOps in action
+
+With `syncPolicy.automated` enabled, changing the desired state in Git is enough to
+change the cluster — no `helm upgrade`, no `kubectl apply`:
+
+```bash
+# edit helm/hello-app/values.yaml (e.g. backend.replicaCount: 2 -> 3)
+git add helm/hello-app/values.yaml
+git commit -m "scale backend to 3 replicas"
+git push
+```
+
+Argo CD detects the change (on its polling interval, or immediately via **Refresh**
+in the UI), the application briefly goes **OutOfSync**, and `selfHeal` reconciles
+the cluster back to Git — the third backend pod appears without any manual deploy.
+`selfHeal` also reverts manual drift: if a resource is changed directly in the
+cluster, Argo CD restores it to the state described in Git.
+
+> **Note:** the ingress needs a running ingress controller to become healthy. On a
+> fresh Minikube it may be disabled — `minikube addons enable ingress` installs the
+> NGINX controller so the ingress gets an address and the application reports
+> **Healthy**. Argo CD manages the manifests and the image *reference*; the images
+> themselves are pulled by the cluster, not by Argo CD.
+
+---
+
 ## Monitoring
 
 ### Install the stack
@@ -252,6 +316,9 @@ Grafana via a labeled ConfigMap — verified to reload automatically after
 - **Packaging with Helm** — the same manifests bundled as a versioned chart, with the
   environment-specific values (image tags, replica counts, hostnames) parametrised so
   one chart deploys to multiple environments
+- **GitOps with Argo CD** — the chart deployed declaratively from Git, with Argo CD
+  reconciling cluster state to the repository (automated sync, selfHeal, drift
+  correction) instead of manual `helm upgrade`
 
 ---
 
@@ -338,17 +405,19 @@ Deliberately out of scope, to keep the example focused:
 │       ├── dashboard-cm.yaml
 │       └── dashboards/
 │           └── backend-overview.json
-└── helm/
-    └── hello-app/             the application, packaged as a Helm chart
-        ├── Chart.yaml
-        ├── values.yaml        default values
-        ├── values-prod.yaml   production overrides
-        └── templates/
-            ├── backend-deployment.yaml
-            ├── backend-service.yaml
-            ├── frontend-deployment.yaml
-            ├── frontend-service.yaml
-            └── ingress.yaml
+├── helm/
+│   └── hello-app/             the application, packaged as a Helm chart
+│       ├── Chart.yaml
+│       ├── values.yaml        default values
+│       ├── values-prod.yaml   production overrides
+│       └── templates/
+│           ├── backend-deployment.yaml
+│           ├── backend-service.yaml
+│           ├── frontend-deployment.yaml
+│           ├── frontend-service.yaml
+│           └── ingress.yaml
+└── argocd/
+    └── application.yaml       Argo CD Application (deploys the chart via GitOps)
 ```
 
 ---
