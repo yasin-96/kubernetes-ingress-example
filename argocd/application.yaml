@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-app
+  namespace: argocd
+spec:
+  project: default
+
+  # WOHER kommt der gewünschte Zustand: dein Git-Repo + Pfad zum Helm-Chart
+  source:
+    repoURL: https://github.com/yasin-96/kubernetes-ingress-example.git
+    targetRevision: main
+    path: helm/hello-app
+
+  # WOHIN wird deployt: welcher Cluster, welcher Namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  # WIE wird synchronisiert
+  syncPolicy:
+    automated:
+      prune: true       # löscht Ressourcen, die aus Git entfernt wurden
+      selfHeal: true     # korrigiert manuelle Änderungen am Cluster zurück auf Git-Stand
+    syncOptions:
+      - CreateNamespace=true
