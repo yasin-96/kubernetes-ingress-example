@@ -43,6 +43,7 @@ demonstrates.
 | Ingress | NGINX Ingress Controller |
 | Metrics | Spring Boot Actuator + Micrometer (Prometheus format) |
 | Monitoring | Prometheus, Grafana (kube-prometheus-stack via Helm) |
+| Packaging | Helm chart (`helm/hello-app/`) with per-environment values |
 | Local cluster | Minikube |
 
 ---
@@ -110,15 +111,15 @@ This is a self-contained multi-stage build — no local Node.js installation req
 
 ### 4. Deploy
 
-```bash
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/backend-service.yaml
-kubectl apply -f k8s/frontend-deployment.yaml
-kubectl apply -f k8s/frontend-service.yaml
-kubectl apply -f k8s/ingress.yaml
+The application is deployed via its Helm chart in `helm/hello-app/`:
 
+```bash
+helm install hello-app ./helm/hello-app
 kubectl rollout status deployment/backend-deployment
 ```
+
+See [Deploying with Helm](#deploying-with-helm) for the chart layout,
+per-environment values, and lifecycle commands.
 
 ### 5. Verify
 
@@ -132,6 +133,54 @@ field, then confirm it reaches the backend:
 ```bash
 kubectl logs -l app=backend --tail=20
 ```
+
+---
+
+## Deploying with Helm
+
+The application — the backend and frontend Deployments and Services and the Ingress —
+is packaged as a **Helm chart** in `helm/hello-app/`. The chart bundles these
+manifests into a single, versioned unit and parametrises the values that typically
+differ between environments — image tags, replica counts, pull policy, and the two
+ingress hostnames — through `values.yaml`.
+
+### Render and lint before installing
+
+```bash
+helm lint ./helm/hello-app
+helm template ./helm/hello-app
+```
+
+`helm template` renders the chart locally and prints the resulting manifests without
+touching the cluster — the equivalent of a dry run, useful for confirming the values
+are substituted as expected.
+
+### Install
+
+```bash
+helm install hello-app ./helm/hello-app
+kubectl rollout status deployment/backend-deployment
+```
+
+### Environment-specific values
+
+`values.yaml` holds the defaults. A second file, `values-prod.yaml`, overrides only
+what differs for a production-style deployment — higher replica counts, pinned image
+tags instead of `latest`, `pullPolicy: IfNotPresent`, and real hostnames:
+
+```bash
+helm install hello-app ./helm/hello-app -f helm/hello-app/values-prod.yaml
+```
+
+The same chart produces both environments; only the values file changes.
+
+### Lifecycle
+
+Once installed as a release, the chart also supports `helm upgrade hello-app
+./helm/hello-app` to roll out changes (each creating a new revision) and
+`helm rollback hello-app <revision>` to return to an earlier one. In CI/CD,
+`helm upgrade --install` covers both first install and subsequent updates with a
+single command.
 
 ---
 
@@ -200,6 +249,9 @@ Grafana via a labeled ConfigMap — verified to reload automatically after
   dashboards are all defined in version control, not clicked together manually
 - **Working behind a TLS-inspecting corporate proxy** — both application builds trust
   an optional corporate root CA without disabling certificate verification
+- **Packaging with Helm** — the same manifests bundled as a versioned chart, with the
+  environment-specific values (image tags, replica counts, hostnames) parametrised so
+  one chart deploys to multiple environments
 
 ---
 
@@ -279,18 +331,24 @@ Deliberately out of scope, to keep the example focused:
 ├── kubernetes-frontend/       React + Vite application
 │   ├── certs/                 optional corporate root CA (gitignored, empty by default)
 │   └── Dockerfile
-└── k8s/
-    ├── backend-deployment.yaml
-    ├── backend-service.yaml
-    ├── frontend-deployment.yaml
-    ├── frontend-service.yaml
-    ├── ingress.yaml
-    └── monitoring/
-        ├── values-prometheus.yaml
-        ├── servicemonitor.yaml
-        ├── dashboard-cm.yaml
-        └── dashboards/
-            └── backend-overview.json
+├── k8s/
+│   └── monitoring/            Prometheus + Grafana stack (applied separately)
+│       ├── values-prometheus.yaml
+│       ├── servicemonitor.yaml
+│       ├── dashboard-cm.yaml
+│       └── dashboards/
+│           └── backend-overview.json
+└── helm/
+    └── hello-app/             the application, packaged as a Helm chart
+        ├── Chart.yaml
+        ├── values.yaml        default values
+        ├── values-prod.yaml   production overrides
+        └── templates/
+            ├── backend-deployment.yaml
+            ├── backend-service.yaml
+            ├── frontend-deployment.yaml
+            ├── frontend-service.yaml
+            └── ingress.yaml
 ```
 
 ---
